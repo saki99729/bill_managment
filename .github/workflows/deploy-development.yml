@@ -1,0 +1,106 @@
+name: Deploy Development to EC2
+
+on:
+  push:
+    branches:
+      - development
+
+jobs:
+  deploy:
+    name: Build and Deploy Development
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout development branch
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      - name: Run Maven Tests
+        run: mvn test
+
+      - name: Build Spring Boot JAR
+        run: mvn clean package -DskipTests
+
+      - name: Prepare Release JAR
+        run: |
+          mkdir -p release
+          cp target/*.jar release/app.jar
+
+      - name: Copy JAR to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_EC2_HOST }}
+          username: ${{ secrets.DEV_EC2_USER }}
+          key: ${{ secrets.DEV_EC2_SSH_KEY }}
+          source: "release/app.jar"
+          target: "/home/ubuntu/application/bill-managment/release"
+
+      - name: Deploy JAR with nohup
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_EC2_HOST }}
+          username: ${{ secrets.DEV_EC2_USER }}
+          key: ${{ secrets.DEV_EC2_SSH_KEY }}
+          script: |
+            BASE_DIR="/home/ubuntu/application/bill-managment/app"
+            RELEASE_DIR="/home/ubuntu/application/bill-managment/release/release"
+            LOG_DIR="/home/ubuntu/application/bill-managment/logs"
+            BACKUP_DIR="/home/ubuntu/application/bill-managment/backups"
+
+            TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+
+            mkdir -p $BASE_DIR
+            mkdir -p $LOG_DIR/output
+            mkdir -p $LOG_DIR/error
+            mkdir -p $BACKUP_DIR
+
+            echo "Backing up existing JAR..."
+            if [ -f "$BASE_DIR/app.jar" ]; then
+              cp $BASE_DIR/app.jar "$BACKUP_DIR/app_$TIMESTAMP.jar"
+            fi
+
+            echo "Copying new JAR..."
+            cp "$RELEASE_DIR/app.jar" "$BASE_DIR/app.jar"
+
+            echo "Stopping old application..."
+            PID=$(pgrep -f "$BASE_DIR/app.jar" || true)
+
+            if [ -n "$PID" ]; then
+              kill -15 $PID
+              sleep 10
+            fi
+
+            STILL_RUNNING=$(pgrep -f "$BASE_DIR/app.jar" || true)
+
+            if [ -n "$STILL_RUNNING" ]; then
+              kill -9 $STILL_RUNNING
+            fi
+
+            echo "Starting new application with nohup..."
+            cd $BASE_DIR
+
+            nohup java -jar app.jar \
+              > "$LOG_DIR/output/app_$TIMESTAMP.out" \
+              2> "$LOG_DIR/error/app_$TIMESTAMP.err" &
+
+            echo $! > "$BASE_DIR/app.pid"
+
+            echo "Waiting for application startup..."
+            sleep 15
+
+            NEW_PID=$(cat "$BASE_DIR/app.pid")
+
+            if ps -p $NEW_PID > /dev/null; then
+              echo "Application started successfully. PID: $NEW_PID"
+            else
+              echo "Application failed to start"
+              echo "Last error log:"
+              tail -n 100 "$LOG_DIR/error/app_$TIMESTAMP.err"
+              exit 1
+            fi
