@@ -43,10 +43,15 @@ jobs:
 
       - name: Deploy JAR with nohup
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DEV_DB_URL: ${{ secrets.DEV_DB_URL }}
+          DEV_DB_USERNAME: ${{ secrets.DEV_DB_USERNAME }}
+          DEV_DB_PASSWORD: ${{ secrets.DEV_DB_PASSWORD }}
         with:
           host: ${{ secrets.DEV_EC2_HOST }}
           username: ${{ secrets.DEV_EC2_USER }}
           key: ${{ secrets.DEV_EC2_SSH_KEY }}
+          envs: DEV_DB_URL,DEV_DB_USERNAME,DEV_DB_PASSWORD
           script: |
             BASE_DIR="/home/ubuntu/application/bill-managment/app"
             RELEASE_DIR="/home/ubuntu/application/bill-managment/release/release"
@@ -54,15 +59,16 @@ jobs:
             BACKUP_DIR="/home/ubuntu/application/bill-managment/backups"
 
             TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+            APP_PORT="9099"
 
-            mkdir -p $BASE_DIR
-            mkdir -p $LOG_DIR/output
-            mkdir -p $LOG_DIR/error
-            mkdir -p $BACKUP_DIR
+            mkdir -p "$BASE_DIR"
+            mkdir -p "$LOG_DIR/output"
+            mkdir -p "$LOG_DIR/error"
+            mkdir -p "$BACKUP_DIR"
 
             echo "Backing up existing JAR..."
             if [ -f "$BASE_DIR/app.jar" ]; then
-              cp $BASE_DIR/app.jar "$BACKUP_DIR/app_$TIMESTAMP.jar"
+              cp "$BASE_DIR/app.jar" "$BACKUP_DIR/app_$TIMESTAMP.jar"
             fi
 
             echo "Copying new JAR..."
@@ -82,10 +88,16 @@ jobs:
               kill -9 $STILL_RUNNING
             fi
 
-            echo "Starting new application with nohup..."
-            cd $BASE_DIR
+            echo "Starting new application with nohup on port $APP_PORT..."
+            cd "$BASE_DIR"
 
-            nohup java -jar app.jar \
+            nohup java \
+              -DSERVER_PORT="$APP_PORT" \
+              -Dserver.port="$APP_PORT" \
+              -DDB_URL="$DEV_DB_URL" \
+              -DDB_USERNAME="$DEV_DB_USERNAME" \
+              -DDB_PASSWORD="$DEV_DB_PASSWORD" \
+              -jar app.jar \
               > "$LOG_DIR/output/app_$TIMESTAMP.out" \
               2> "$LOG_DIR/error/app_$TIMESTAMP.err" &
 
@@ -98,8 +110,15 @@ jobs:
 
             if ps -p $NEW_PID > /dev/null; then
               echo "Application started successfully. PID: $NEW_PID"
+              echo "Application process:"
+              pgrep -af "$BASE_DIR/app.jar" || true
+
+              echo "Checking port $APP_PORT..."
+              ss -tulpn | grep ":$APP_PORT" || true
             else
               echo "Application failed to start"
+              echo "Last output log:"
+              tail -n 100 "$LOG_DIR/output/app_$TIMESTAMP.out"
               echo "Last error log:"
               tail -n 100 "$LOG_DIR/error/app_$TIMESTAMP.err"
               exit 1
