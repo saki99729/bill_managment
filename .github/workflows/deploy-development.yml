@@ -1,6 +1,8 @@
 name: Deploy Development to EC2
 
 on:
+  workflow_dispatch:
+
   push:
     branches:
       - development
@@ -39,7 +41,7 @@ jobs:
           username: ${{ secrets.DEV_EC2_USER }}
           key: ${{ secrets.DEV_EC2_SSH_KEY }}
           source: "release/app.jar"
-          target: "/home/ubuntu/application/bill-managment/release"
+          target: "/home/ubuntu/application/bill-managment"
 
       - name: Deploy JAR with nohup
         uses: appleboy/ssh-action@v1.0.3
@@ -72,7 +74,7 @@ jobs:
             if [ ! -f "$RELEASE_DIR/app.jar" ]; then
               echo "New JAR not found at $RELEASE_DIR/app.jar"
               echo "Files inside $BASE_ROOT:"
-              find "$BASE_ROOT" -maxdepth 3 -type f
+              find "$BASE_ROOT" -maxdepth 4 -type f
               exit 1
             fi
 
