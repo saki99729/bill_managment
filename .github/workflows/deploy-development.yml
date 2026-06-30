@@ -39,7 +39,7 @@ jobs:
           username: ${{ secrets.DEV_EC2_USER }}
           key: ${{ secrets.DEV_EC2_SSH_KEY }}
           source: "release/app.jar"
-          target: "/home/ubuntu/application/bill-managment"
+          target: "/home/ubuntu/application/bill-managment/release"
 
       - name: Deploy JAR with nohup
         uses: appleboy/ssh-action@v1.0.3
