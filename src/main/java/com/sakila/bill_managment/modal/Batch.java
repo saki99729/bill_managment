@@ -3,7 +3,6 @@ package com.sakila.bill_managment.modal;
 import jakarta.persistence.*;
 import lombok.*;
 import org.antlr.v4.runtime.misc.NotNull;
-import org.springframework.data.annotation.Id;
 
 import java.util.Date;
 

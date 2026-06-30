@@ -12,6 +12,7 @@ import lombok.Setter;
 @Table(name = "discount")
 public class Discount {
 
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Long id;
