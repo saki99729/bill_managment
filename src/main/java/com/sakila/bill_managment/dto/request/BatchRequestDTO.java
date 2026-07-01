@@ -1,0 +1,26 @@
+package com.sakila.bill_managment.dto.request;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.util.Date;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class BatchRequestDTO {
+
+    private String batchName;
+    private String batchNumber;
+    private String barCode;
+    private String qrCode;
+    private double totalPrice;
+    private int quantity;
+    private Date manufactureDate;
+    private Date expiryDate;
+    private Date createdAt;
+    private Date updatedAt;
+    private int createdBy;
+    private int updatedBy;
+}
