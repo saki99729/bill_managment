@@ -18,9 +18,9 @@ public class Discount {
     private Long id;
 
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne
     @JoinColumn(name = "batch_id")
-    private Batch batchId;
+    private Batch batch;
 
     @Column(name = "discount_percentage", nullable = false)
     private double discountPercentage;
